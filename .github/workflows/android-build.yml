@@ -20,16 +20,18 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android SDK Licenses
+      - name: Configure Android SDK & Accept Licenses
         shell: bash
         run: |
-          SDK_MANAGER="${ANDROID_HOME:-$ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"
-          if [ -x "$SDK_MANAGER" ]; then
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          SDK_MANAGER=$(find "$SDK_ROOT/cmdline-tools" -name sdkmanager -type f 2>/dev/null | head -n 1)
+          if [ -n "$SDK_MANAGER" ]; then
+            chmod +x "$SDK_MANAGER"
             yes | "$SDK_MANAGER" --licenses > /dev/null 2>&1 || true
           fi
+          echo "Using Android SDK at: $SDK_ROOT"
 
       - name: Restore Debug Keystore & Environment Config
         shell: bash
@@ -54,9 +56,6 @@ jobs:
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace
 
-      - name: Run Unit Tests
-        run: gradle :app:testDebugUnitTest --no-daemon
-
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -64,6 +63,9 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Run Unit Tests
+        run: gradle :app:testDebugUnitTest --no-daemon
 
   build-release-optional:
     name: Build Signed Release (When Secrets Configured)
@@ -97,16 +99,16 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Android SDK
-        if: steps.check_secrets.outputs.enabled == 'true'
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android SDK Licenses
+      - name: Configure Android SDK & Accept Licenses
         if: steps.check_secrets.outputs.enabled == 'true'
         shell: bash
         run: |
-          SDK_MANAGER="${ANDROID_HOME:-$ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"
-          if [ -x "$SDK_MANAGER" ]; then
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          SDK_MANAGER=$(find "$SDK_ROOT/cmdline-tools" -name sdkmanager -type f 2>/dev/null | head -n 1)
+          if [ -n "$SDK_MANAGER" ]; then
+            chmod +x "$SDK_MANAGER"
             yes | "$SDK_MANAGER" --licenses > /dev/null 2>&1 || true
           fi
 
