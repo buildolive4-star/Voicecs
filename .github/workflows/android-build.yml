@@ -24,6 +24,7 @@ jobs:
         shell: bash
         run: |
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          sudo chown -R "$(id -u):$(id -g)" "$SDK_ROOT" || true
           echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
           SDK_MANAGER=$(find "$SDK_ROOT/cmdline-tools" -name sdkmanager -type f 2>/dev/null | head -n 1)
@@ -53,7 +54,12 @@ jobs:
           gradle-version: '9.3.1'
 
       - name: Build Debug APK
-        run: gradle :app:assembleDebug --no-daemon --stacktrace
+        run: >
+          gradle :app:assembleDebug
+          --no-daemon
+          --console=plain
+          -Dorg.gradle.jvmargs="-Xmx3g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"
+          -Dorg.gradle.workers.max=2
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
@@ -64,7 +70,12 @@ jobs:
           retention-days: 30
 
       - name: Run Unit Tests
-        run: gradle :app:testDebugUnitTest --no-daemon
+        run: >
+          gradle :app:testDebugUnitTest
+          --no-daemon
+          --console=plain
+          -Dorg.gradle.jvmargs="-Xmx3g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"
+          -Dorg.gradle.workers.max=2
 
   build-release-optional:
     name: Build Signed Release (When Secrets Configured)
@@ -103,6 +114,7 @@ jobs:
         shell: bash
         run: |
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          sudo chown -R "$(id -u):$(id -g)" "$SDK_ROOT" || true
           echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
           SDK_MANAGER=$(find "$SDK_ROOT/cmdline-tools" -name sdkmanager -type f 2>/dev/null | head -n 1)
@@ -136,7 +148,12 @@ jobs:
           KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: gradle :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace
+        run: >
+          gradle :app:assembleRelease :app:bundleRelease
+          --no-daemon
+          --console=plain
+          -Dorg.gradle.jvmargs="-Xmx3g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8"
+          -Dorg.gradle.workers.max=2
 
       - name: Upload Release Artifacts
         if: steps.check_secrets.outputs.enabled == 'true'
