@@ -121,7 +121,9 @@ fun ProfileScreen(
     onUpdatePrivacy: (Boolean, Boolean, Boolean, Boolean) -> Unit,
     onUnblockUser: (String) -> Unit,
     onDeleteAccount: () -> Unit,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    isPrototypeMode: Boolean = false,
+    onConnectGoogleAccount: () -> Unit = {}
 ) {
     var subSection by remember(initialSubSection) { mutableStateOf(initialSubSection) }
 
@@ -260,6 +262,25 @@ fun ProfileScreen(
                 item {
                     ProfileMenuTile(Icons.Filled.Security, "Privacy, Sessions & Safety", "Online visibility, blocked users & sign out", TextSecondary) {
                         subSection = ProfileSubSection.PRIVACY
+                    }
+                }
+                if (isPrototypeMode) {
+                    item {
+                        GlassCard(borderColor = NeonCyan.copy(alpha = 0.55f)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("Prototype Demo Mode", style = MaterialTheme.typography.titleMedium, color = NeonCyan)
+                                Text(
+                                    "Running with interactive local data (no sign-in needed). Connect Google anytime to sync live with Cloud Firestore.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TextSecondary
+                                )
+                                GradientButton(
+                                    text = "Connect Google Account (Cloud Sync)",
+                                    onClick = onConnectGoogleAccount,
+                                    modifier = Modifier.fillMaxWidth().testTag("connect_google_button")
+                                )
+                            }
+                        }
                     }
                 }
             }

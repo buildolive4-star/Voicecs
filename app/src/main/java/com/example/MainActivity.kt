@@ -127,6 +127,7 @@ private enum class SocialTab(
 fun SocialVerseRoot() {
     val auth = remember { Firebase.auth }
     var signedInUid by remember { mutableStateOf(auth.currentUser?.uid) }
+    var showGoogleAuth by remember { mutableStateOf(false) }
 
     DisposableEffect(auth) {
         val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
@@ -137,17 +138,30 @@ fun SocialVerseRoot() {
     }
 
     val currentUid = signedInUid
-    if (currentUid.isNullOrBlank()) {
+    if (showGoogleAuth && currentUid.isNullOrBlank()) {
         AuthScreen(
             onAuthSuccess = {
                 signedInUid = auth.currentUser?.uid
+                showGoogleAuth = false
+            },
+            onSkipToPrototype = {
+                showGoogleAuth = false
             }
         )
     } else {
-        key(currentUid) {
+        val activeUid = currentUid?.takeIf { it.isNotBlank() } ?: "demo_user_aarav"
+        val isPrototype = currentUid.isNullOrBlank()
+        key(activeUid, isPrototype) {
             AuthenticatedSocialVerseApp(
-                uid = currentUid,
-                onSignedOut = { signedInUid = null }
+                uid = activeUid,
+                isPrototypeMode = isPrototype,
+                onSignedOut = {
+                    signedInUid = null
+                    showGoogleAuth = false
+                },
+                onRequestGoogleAuth = {
+                    showGoogleAuth = true
+                }
             )
         }
     }
@@ -156,7 +170,9 @@ fun SocialVerseRoot() {
 @Composable
 private fun AuthenticatedSocialVerseApp(
     uid: String,
-    onSignedOut: () -> Unit
+    isPrototypeMode: Boolean,
+    onSignedOut: () -> Unit,
+    onRequestGoogleAuth: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -164,12 +180,12 @@ private fun AuthenticatedSocialVerseApp(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val viewModel: SocialVerseViewModel = viewModel(
-        key = uid,
+        key = "${uid}_$isPrototypeMode",
         factory = viewModelFactory {
             initializer {
                 val app = checkNotNull(this[APPLICATION_KEY])
                 SocialVerseViewModel(
-                    repository = SocialVerseRepository(app),
+                    repository = if (isPrototypeMode) null else SocialVerseRepository(app),
                     currentUserId = uid
                 )
             }
@@ -214,11 +230,15 @@ private fun AuthenticatedSocialVerseApp(
 
     val performSignOut: () -> Unit = {
         viewModel.leaveActiveRoom()
-        signOutUser(
-            credentialManager = credentialManager,
-            scope = scope,
-            onSignOutComplete = onSignedOut
-        )
+        if (isPrototypeMode) {
+            onRequestGoogleAuth()
+        } else {
+            signOutUser(
+                credentialManager = credentialManager,
+                scope = scope,
+                onSignOutComplete = onSignedOut
+            )
+        }
     }
 
     Box(
@@ -516,7 +536,9 @@ private fun AuthenticatedSocialVerseApp(
                                             },
                                             onUnblockUser = { targetUid -> viewModel.toggleBlockUser(targetUid, false) },
                                             onDeleteAccount = { viewModel.deleteAccount(onDeleted = performSignOut) },
-                                            onSignOut = performSignOut
+                                            onSignOut = performSignOut,
+                                            isPrototypeMode = isPrototypeMode,
+                                            onConnectGoogleAccount = onRequestGoogleAuth
                                         )
                                     }
                                 }

@@ -12,6 +12,7 @@ import com.example.data.FollowRelation
 import com.example.data.GameRecord
 import com.example.data.GiftTransaction
 import com.example.data.PrivateCall
+import com.example.data.PrototypeDataStore
 import com.example.data.SocialRequest
 import com.example.data.SocialVerseRepository
 import com.example.data.SpeakerRequest
@@ -37,6 +38,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -51,9 +53,13 @@ sealed interface UiState<out T> {
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SocialVerseViewModel(
-    private val repository: SocialVerseRepository,
+    private val repository: SocialVerseRepository?,
     val currentUserId: String
 ) : ViewModel() {
+
+    val isPrototypeMode: Boolean = repository == null
+    private val prototypeStore: PrototypeDataStore? =
+        if (repository == null) PrototypeDataStore(currentUserId) else null
 
     val audioEngine = VoiceAudioEngine()
 
@@ -74,6 +80,11 @@ class SocialVerseViewModel(
 
     private val _activeCallId = MutableStateFlow<String?>(null)
     val activeCallId: StateFlow<String?> = _activeCallId.asStateFlow()
+
+    private val _prototypeTick = MutableStateFlow(0L)
+    private fun bumpPrototype() {
+        _prototypeTick.value += 1L
+    }
 
     private fun <T> Flow<T>.toUiState(tag: String, fallback: String): StateFlow<UiState<T>> =
         this.map<T, UiState<T>> { UiState.Success(it) }
@@ -106,91 +117,156 @@ class SocialVerseViewModel(
         )
 
     val myProfileState: StateFlow<UiState<UserPublicProfile?>> =
-        repository.observeCurrentUserProfile(currentUserId)
-            .toUiState("Profile", "Failed to load profile")
+        if (repository != null) {
+            repository.observeCurrentUserProfile(currentUserId)
+                .toUiState("Profile", "Failed to load profile")
+        } else {
+            prototypeStore!!.myProfile
+                .map<UserPublicProfile, UiState<UserPublicProfile?>> { UiState.Success(it) }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, UiState.Success(prototypeStore.myProfile.value))
+        }
 
     val myPrivateState: StateFlow<UserPrivateAccount?> =
-        repository.observeCurrentUserPrivate(currentUserId)
-            .toSafeState(null, "PrivateAccount")
+        if (repository != null) {
+            repository.observeCurrentUserPrivate(currentUserId).toSafeState(null, "PrivateAccount")
+        } else {
+            prototypeStore!!.myPrivate
+                .map<UserPrivateAccount, UserPrivateAccount?> { it }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, prototypeStore.myPrivate.value)
+        }
 
     val discoverUsers: StateFlow<List<UserPublicProfile>> =
-        repository.observeDiscoverableUsers(currentUserId)
-            .toSafeState(emptyList(), "DiscoverUsers")
+        repository?.observeDiscoverableUsers(currentUserId)?.toSafeState(emptyList(), "DiscoverUsers")
+            ?: prototypeStore!!.discoverUsers
 
     val liveRoomsState: StateFlow<UiState<List<VoiceRoom>>> =
-        repository.observeLiveRooms(currentUserId)
-            .toUiState("LiveRooms", "Failed to load live rooms")
+        if (repository != null) {
+            repository.observeLiveRooms(currentUserId).toUiState("LiveRooms", "Failed to load live rooms")
+        } else {
+            prototypeStore!!.rooms
+                .map<List<VoiceRoom>, UiState<List<VoiceRoom>>> { UiState.Success(it) }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, UiState.Success(prototypeStore.rooms.value))
+        }
 
     val walletLedger: StateFlow<List<WalletLedgerEntry>> =
-        repository.observeWalletLedger(currentUserId)
-            .toSafeState(emptyList(), "WalletLedger")
+        repository?.observeWalletLedger(currentUserId)?.toSafeState(emptyList(), "WalletLedger")
+            ?: prototypeStore!!.walletLedger
 
     val notifications: StateFlow<List<UserNotification>> =
-        repository.observeNotifications(currentUserId)
-            .toSafeState(emptyList(), "Notifications")
+        repository?.observeNotifications(currentUserId)?.toSafeState(emptyList(), "Notifications")
+            ?: prototypeStore!!.notifications
 
     val friendRequests: StateFlow<List<SocialRequest>> =
-        repository.observeFriendRequests(currentUserId)
-            .toSafeState(emptyList(), "FriendRequests")
+        repository?.observeFriendRequests(currentUserId)?.toSafeState(emptyList(), "FriendRequests")
+            ?: prototypeStore!!.friendRequests
 
     val cpRequests: StateFlow<List<SocialRequest>> =
-        repository.observeCpRequests(currentUserId)
-            .toSafeState(emptyList(), "CpRequests")
+        repository?.observeCpRequests(currentUserId)?.toSafeState(emptyList(), "CpRequests")
+            ?: prototypeStore!!.cpRequests
 
     val follows: StateFlow<List<FollowRelation>> =
-        repository.observeFollows(currentUserId)
-            .toSafeState(emptyList(), "Follows")
+        repository?.observeFollows(currentUserId)?.toSafeState(emptyList(), "Follows")
+            ?: prototypeStore!!.follows
 
     val conversations: StateFlow<List<Conversation>> =
-        repository.observeConversations(currentUserId)
-            .toSafeState(emptyList(), "Conversations")
+        repository?.observeConversations(currentUserId)?.toSafeState(emptyList(), "Conversations")
+            ?: prototypeStore!!.conversations
 
     val privateCalls: StateFlow<List<PrivateCall>> =
-        repository.observePrivateCalls(currentUserId)
-            .toSafeState(emptyList(), "PrivateCalls")
+        repository?.observePrivateCalls(currentUserId)?.toSafeState(emptyList(), "PrivateCalls")
+            ?: prototypeStore!!.privateCalls
 
     val giftTransactions: StateFlow<List<GiftTransaction>> =
-        repository.observeGiftTransactions(currentUserId)
-            .toSafeState(emptyList(), "GiftTx")
+        repository?.observeGiftTransactions(currentUserId)?.toSafeState(emptyList(), "GiftTx")
+            ?: prototypeStore!!.giftTransactions
 
     val families: StateFlow<List<Family>> =
-        repository.observeFamilies(currentUserId)
-            .toSafeState(emptyList(), "Families")
+        repository?.observeFamilies(currentUserId)?.toSafeState(emptyList(), "Families")
+            ?: prototypeStore!!.families
 
     val gameRecords: StateFlow<List<GameRecord>> =
-        repository.observeGameRecords(currentUserId)
-            .toSafeState(emptyList(), "GameRecords")
+        repository?.observeGameRecords(currentUserId)?.toSafeState(emptyList(), "GameRecords")
+            ?: prototypeStore!!.gameRecords
 
     // Active Voice Room Streams
-    val activeRoom: StateFlow<VoiceRoom?> = _activeRoomId.flatMapLatest { id ->
-        if (id.isNullOrBlank()) flowOf(null) else repository.observeRoom(id, currentUserId)
-    }.toSafeState(null, "ActiveRoom")
+    val activeRoom: StateFlow<VoiceRoom?> =
+        if (repository != null) {
+            _activeRoomId.flatMapLatest { id ->
+                if (id.isNullOrBlank()) flowOf(null) else repository.observeRoom(id, currentUserId)
+            }.toSafeState(null, "ActiveRoom")
+        } else {
+            combine(_activeRoomId, _prototypeTick) { id, _ ->
+                if (id.isNullOrBlank()) null else prototypeStore!!.getRoom(id)
+            }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+        }
 
-    val activeRoomSeats: StateFlow<List<VoiceRoomSeat>> = _activeRoomId.flatMapLatest { id ->
-        if (id.isNullOrBlank()) flowOf(emptyList()) else repository.observeRoomSeats(id, currentUserId)
-    }.toSafeState(emptyList(), "RoomSeats")
+    val activeRoomSeats: StateFlow<List<VoiceRoomSeat>> =
+        if (repository != null) {
+            _activeRoomId.flatMapLatest { id ->
+                if (id.isNullOrBlank()) flowOf(emptyList()) else repository.observeRoomSeats(id, currentUserId)
+            }.toSafeState(emptyList(), "RoomSeats")
+        } else {
+            combine(_activeRoomId, _prototypeTick) { id, _ ->
+                if (id.isNullOrBlank()) emptyList() else prototypeStore!!.getRoomSeats(id)
+            }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        }
 
-    val activeRoomMessages: StateFlow<List<VoiceRoomMessage>> = _activeRoomId.flatMapLatest { id ->
-        if (id.isNullOrBlank()) flowOf(emptyList()) else repository.observeRoomMessages(id, currentUserId)
-    }.toSafeState(emptyList(), "RoomMessages")
+    val activeRoomMessages: StateFlow<List<VoiceRoomMessage>> =
+        if (repository != null) {
+            _activeRoomId.flatMapLatest { id ->
+                if (id.isNullOrBlank()) flowOf(emptyList()) else repository.observeRoomMessages(id, currentUserId)
+            }.toSafeState(emptyList(), "RoomMessages")
+        } else {
+            combine(_activeRoomId, _prototypeTick) { id, _ ->
+                if (id.isNullOrBlank()) emptyList() else prototypeStore!!.getRoomMessages(id)
+            }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        }
 
-    val activeSpeakerRequests: StateFlow<List<SpeakerRequest>> = _activeRoomId.flatMapLatest { id ->
-        if (id.isNullOrBlank()) flowOf(emptyList()) else repository.observeSpeakerRequests(id, currentUserId)
-    }.toSafeState(emptyList(), "SpeakerRequests")
+    val activeSpeakerRequests: StateFlow<List<SpeakerRequest>> =
+        if (repository != null) {
+            _activeRoomId.flatMapLatest { id ->
+                if (id.isNullOrBlank()) flowOf(emptyList()) else repository.observeSpeakerRequests(id, currentUserId)
+            }.toSafeState(emptyList(), "SpeakerRequests")
+        } else {
+            combine(_activeRoomId, _prototypeTick) { id, _ ->
+                if (id.isNullOrBlank()) emptyList() else prototypeStore!!.getSpeakerRequests(id)
+            }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        }
 
     // Active Conversation Stream
-    val activeMessages: StateFlow<List<DirectMessage>> = _activeConversationId.flatMapLatest { id ->
-        if (id.isNullOrBlank()) flowOf(emptyList()) else repository.observeDirectMessages(id, currentUserId)
-    }.toSafeState(emptyList(), "DirectMessages")
+    val activeMessages: StateFlow<List<DirectMessage>> =
+        if (repository != null) {
+            _activeConversationId.flatMapLatest { id ->
+                if (id.isNullOrBlank()) flowOf(emptyList()) else repository.observeDirectMessages(id, currentUserId)
+            }.toSafeState(emptyList(), "DirectMessages")
+        } else {
+            combine(_activeConversationId, _prototypeTick) { id, _ ->
+                if (id.isNullOrBlank()) emptyList() else prototypeStore!!.getDirectMessages(id)
+            }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        }
 
     // Active Family Streams
-    val activeFamilyMembers: StateFlow<List<FamilyMember>> = _activeFamilyId.flatMapLatest { id ->
-        if (id.isNullOrBlank()) flowOf(emptyList()) else repository.observeFamilyMembers(id, currentUserId)
-    }.toSafeState(emptyList(), "FamilyMembers")
+    val activeFamilyMembers: StateFlow<List<FamilyMember>> =
+        if (repository != null) {
+            _activeFamilyId.flatMapLatest { id ->
+                if (id.isNullOrBlank()) flowOf(emptyList()) else repository.observeFamilyMembers(id, currentUserId)
+            }.toSafeState(emptyList(), "FamilyMembers")
+        } else {
+            combine(_activeFamilyId, _prototypeTick) { id, _ ->
+                if (id.isNullOrBlank()) emptyList() else prototypeStore!!.getFamilyMembers(id)
+            }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        }
 
-    val activeFamilyMessages: StateFlow<List<FamilyMessage>> = _activeFamilyId.flatMapLatest { id ->
-        if (id.isNullOrBlank()) flowOf(emptyList()) else repository.observeFamilyMessages(id, currentUserId)
-    }.toSafeState(emptyList(), "FamilyMessages")
+    val activeFamilyMessages: StateFlow<List<FamilyMessage>> =
+        if (repository != null) {
+            _activeFamilyId.flatMapLatest { id ->
+                if (id.isNullOrBlank()) flowOf(emptyList()) else repository.observeFamilyMessages(id, currentUserId)
+            }.toSafeState(emptyList(), "FamilyMessages")
+        } else {
+            combine(_activeFamilyId, _prototypeTick) { id, _ ->
+                if (id.isNullOrBlank()) emptyList() else prototypeStore!!.getFamilyMessages(id)
+            }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+        }
 
     private fun currentProfileOrNull(): UserPublicProfile? =
         (myProfileState.value as? UiState.Success)?.data
@@ -212,8 +288,9 @@ class SocialVerseViewModel(
         language: String,
         avatarEmoji: String
     ) {
+        val repo = repository ?: return
         viewModelScope.launch {
-            repository.createInitialProfile(
+            repo.createInitialProfile(
                 fullName, username, dobIso, adultEligible, country, language, avatarEmoji
             ).onSuccess {
                 notify("Welcome to SocialVerse! +1,000 starter virtual coins credited.")
@@ -233,8 +310,15 @@ class SocialVerseViewModel(
         nameColor: String,
         chatBubble: String
     ) {
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.updateCustomization(displayName, bio, avatarEmoji, country, language, frame, nameColor, chatBubble)
+            bumpPrototype()
+            notify("Profile customization saved!")
+            return
+        }
         viewModelScope.launch {
-            repository.updateProfileCustomization(
+            repo.updateProfileCustomization(
                 displayName, bio, avatarEmoji, country, language, frame, nameColor, chatBubble
             ).onSuccess {
                 notify("Profile customization saved!")
@@ -250,24 +334,44 @@ class SocialVerseViewModel(
         allowFriendRequests: Boolean,
         discoverable: Boolean
     ) {
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.updatePrivacy(hideOnline, hideLastSeen, allowFriendRequests, discoverable)
+            bumpPrototype()
+            notify("Privacy settings updated")
+            return
+        }
         viewModelScope.launch {
-            repository.updatePrivacySettings(hideOnline, hideLastSeen, allowFriendRequests, discoverable)
+            repo.updatePrivacySettings(hideOnline, hideLastSeen, allowFriendRequests, discoverable)
                 .onSuccess { notify("Privacy settings updated") }
                 .onFailure { notify(it.localizedMessage ?: "Failed to update privacy") }
         }
     }
 
     fun toggleBlockUser(targetUid: String, block: Boolean) {
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.toggleBlockUser(targetUid, block)
+            bumpPrototype()
+            notify(if (block) "User blocked" else "User unblocked")
+            return
+        }
         viewModelScope.launch {
-            repository.toggleBlockUser(targetUid, block)
+            repo.toggleBlockUser(targetUid, block)
                 .onSuccess { notify(if (block) "User blocked" else "User unblocked") }
                 .onFailure { notify(it.localizedMessage ?: "Action failed") }
         }
     }
 
     fun deleteAccount(onDeleted: () -> Unit) {
+        val repo = repository
+        if (repo == null) {
+            notify("Prototype session reset.")
+            onDeleted()
+            return
+        }
         viewModelScope.launch {
-            repository.deleteAccountData()
+            repo.deleteAccountData()
                 .onSuccess {
                     notify("Account profile removed")
                     onDeleted()
@@ -279,32 +383,65 @@ class SocialVerseViewModel(
     // --- Wallet & VIP ---
 
     fun claimDailyReward() {
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.claimDailyReward()
+                ?.onSuccess { coins ->
+                    bumpPrototype()
+                    notify("Daily Check-In claimed! +$coins Virtual Coins & +50 XP")
+                }
+                ?.onFailure { notify(it.localizedMessage ?: "Daily reward unavailable") }
+            return
+        }
         val isSvip = currentProfileOrNull()?.vipTier == "SVIP"
         viewModelScope.launch {
-            repository.claimDailyReward(isSvip)
+            repo.claimDailyReward(isSvip)
                 .onSuccess { coins -> notify("Daily Check-In claimed! +$coins Virtual Coins & +50 XP") }
                 .onFailure { notify(it.localizedMessage ?: "Daily reward unavailable") }
         }
     }
 
     fun claimPromoCoins(amount: Long, label: String) {
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.claimPromoCoins(amount, label)
+            bumpPrototype()
+            notify("+$amount Virtual Coins added to your wallet!")
+            return
+        }
         viewModelScope.launch {
-            repository.claimPromoVirtualCoins(amount, label)
+            repo.claimPromoVirtualCoins(amount, label)
                 .onSuccess { notify("+$amount Virtual Coins added to your wallet!") }
                 .onFailure { notify(it.localizedMessage ?: "Failed to credit coins") }
         }
     }
 
     fun activateVip(plan: VipPlan) {
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.activateVip(plan)
+                ?.onSuccess {
+                    bumpPrototype()
+                    notify("${plan.title} activated for ${plan.durationDays} days!")
+                }
+                ?.onFailure { notify(it.localizedMessage ?: "Could not activate membership") }
+            return
+        }
         viewModelScope.launch {
-            repository.activateVipPlan(plan)
+            repo.activateVipPlan(plan)
                 .onSuccess { notify("${plan.title} activated for ${plan.durationDays} days!") }
                 .onFailure { notify(it.localizedMessage ?: "Could not activate membership") }
         }
     }
 
     fun markNotificationRead(notifId: String) {
-        viewModelScope.launch { repository.markNotificationRead(notifId) }
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.markNotificationRead(notifId)
+            bumpPrototype()
+            return
+        }
+        viewModelScope.launch { repo.markNotificationRead(notifId) }
     }
 
     // --- Voice Rooms ---
@@ -320,9 +457,19 @@ class SocialVerseViewModel(
         maxSeats: Int,
         adultOnly: Boolean
     ) {
+        val repo = repository
+        if (repo == null) {
+            val roomId = prototypeStore?.createVoiceRoom(
+                title, category, roomType, passwordCode, language, announcement, themeKey, maxSeats, adultOnly
+            )
+            _activeRoomId.value = roomId
+            bumpPrototype()
+            notify("Live voice room created!")
+            return
+        }
         val profile = currentProfileOrNull() ?: return
         viewModelScope.launch {
-            repository.createVoiceRoom(
+            repo.createVoiceRoom(
                 profile, title, category, roomType, passwordCode, language, announcement, themeKey, maxSeats, adultOnly
             ).onSuccess { roomId ->
                 _activeRoomId.value = roomId
@@ -339,9 +486,16 @@ class SocialVerseViewModel(
             notify("Age safety guard: 18+ rooms are restricted for this account.")
             return
         }
+        val repo = repository
+        if (repo == null) {
+            _activeRoomId.value = room.id
+            prototypeStore?.joinRoom(room.id)
+            bumpPrototype()
+            return
+        }
         viewModelScope.launch {
             _activeRoomId.value = room.id
-            repository.joinVoiceRoom(room.id, profile)
+            repo.joinVoiceRoom(room.id, profile)
                 .onFailure { notify(it.localizedMessage ?: "Failed to join room") }
         }
     }
@@ -351,8 +505,14 @@ class SocialVerseViewModel(
         val mySeat = activeRoomSeats.value.firstOrNull { it.occupantUid == currentUserId }
         audioEngine.stopCapture()
         _activeRoomId.value = null
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.leaveRoom(roomId)
+            bumpPrototype()
+            return
+        }
         viewModelScope.launch {
-            repository.leaveVoiceRoom(roomId, mySeat?.id)
+            repo.leaveVoiceRoom(roomId, mySeat?.id)
         }
     }
 
@@ -360,8 +520,15 @@ class SocialVerseViewModel(
         val roomId = _activeRoomId.value ?: return
         audioEngine.stopCapture()
         _activeRoomId.value = null
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.closeRoom(roomId)
+            bumpPrototype()
+            notify("Voice room closed")
+            return
+        }
         viewModelScope.launch {
-            repository.closeVoiceRoom(roomId)
+            repo.closeVoiceRoom(roomId)
                 .onSuccess { notify("Voice room closed") }
                 .onFailure { notify(it.localizedMessage ?: "Failed to close room") }
         }
@@ -369,13 +536,20 @@ class SocialVerseViewModel(
 
     fun takeSeat(seat: VoiceRoomSeat) {
         val roomId = _activeRoomId.value ?: return
-        val profile = currentProfileOrNull() ?: return
         if (seat.locked) {
             notify("This microphone seat is locked by the host.")
             return
         }
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.takeSeat(roomId, seat.id)
+            bumpPrototype()
+            notify("You are now on Mic #${seat.seatIndex + 1}!")
+            return
+        }
+        val profile = currentProfileOrNull() ?: return
         viewModelScope.launch {
-            repository.takeMicSeat(roomId, seat.id, profile)
+            repo.takeMicSeat(roomId, seat.id, profile)
                 .onSuccess { notify("You are now on Mic #${seat.seatIndex + 1}!") }
                 .onFailure { notify(it.localizedMessage ?: "Could not take mic seat") }
         }
@@ -384,8 +558,14 @@ class SocialVerseViewModel(
     fun stepDownSeat(seat: VoiceRoomSeat) {
         val roomId = _activeRoomId.value ?: return
         audioEngine.stopCapture()
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.stepDownSeat(roomId, seat.id)
+            bumpPrototype()
+            return
+        }
         viewModelScope.launch {
-            repository.stepDownFromSeat(roomId, seat.id, seat.occupantUid)
+            repo.stepDownFromSeat(roomId, seat.id, seat.occupantUid)
         }
     }
 
@@ -395,23 +575,42 @@ class SocialVerseViewModel(
         if (seat.occupantUid == currentUserId && nextMute) {
             audioEngine.stopCapture()
         }
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.toggleSeatMute(roomId, seat.id)
+            bumpPrototype()
+            return
+        }
         viewModelScope.launch {
-            repository.toggleSeatMute(roomId, seat.id, nextMute)
+            repo.toggleSeatMute(roomId, seat.id, nextMute)
         }
     }
 
     fun toggleSeatLock(seat: VoiceRoomSeat) {
         val roomId = _activeRoomId.value ?: return
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.toggleSeatLock(roomId, seat.id)
+            bumpPrototype()
+            return
+        }
         viewModelScope.launch {
-            repository.toggleSeatLock(roomId, seat.id, !seat.locked)
+            repo.toggleSeatLock(roomId, seat.id, !seat.locked)
         }
     }
 
     fun requestMic() {
         val roomId = _activeRoomId.value ?: return
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.requestMic(roomId)
+            bumpPrototype()
+            notify("Microphone request sent to host!")
+            return
+        }
         val profile = currentProfileOrNull() ?: return
         viewModelScope.launch {
-            repository.requestMicSeat(roomId, profile)
+            repo.requestMicSeat(roomId, profile)
                 .onSuccess { notify("Microphone request sent to host!") }
                 .onFailure { notify(it.localizedMessage ?: "Failed to request mic") }
         }
@@ -424,8 +623,14 @@ class SocialVerseViewModel(
             notify("No unlocked empty microphone seats available.")
             return
         }
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.approveSpeakerRequest(roomId, req, approve, emptySeat)
+            bumpPrototype()
+            return
+        }
         viewModelScope.launch {
-            repository.respondSpeakerRequest(
+            repo.respondSpeakerRequest(
                 roomId, req.requesterId, approve, emptySeat, req.requesterName, req.requesterAvatar
             )
         }
@@ -435,16 +640,29 @@ class SocialVerseViewModel(
         val roomId = _activeRoomId.value ?: return
         val profile = currentProfileOrNull() ?: return
         if (text.isBlank()) return
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.appendRoomMessage(roomId, profile, text.trim(), "TEXT")
+            bumpPrototype()
+            return
+        }
         viewModelScope.launch {
-            repository.sendRoomMessage(roomId, profile, text)
+            repo.sendRoomMessage(roomId, profile, text)
                 .onFailure { notify(it.localizedMessage ?: "Message failed") }
         }
     }
 
     fun updateRoomSettings(title: String, announcement: String, themeKey: String, roomType: String, passwordCode: String) {
         val roomId = _activeRoomId.value ?: return
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.updateRoomSettings(roomId, title, announcement, themeKey, roomType, passwordCode)
+            bumpPrototype()
+            notify("Room settings updated")
+            return
+        }
         viewModelScope.launch {
-            repository.updateRoomHostSettings(roomId, title, announcement, themeKey, roomType, passwordCode)
+            repo.updateRoomHostSettings(roomId, title, announcement, themeKey, roomType, passwordCode)
                 .onSuccess { notify("Room settings updated") }
                 .onFailure { notify(it.localizedMessage ?: "Failed to update room") }
         }
@@ -454,8 +672,24 @@ class SocialVerseViewModel(
 
     fun sendGift(recipientId: String, recipientName: String, gift: VirtualGift, roomId: String? = _activeRoomId.value) {
         val profile = currentProfileOrNull() ?: return
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.sendGift(recipientId, recipientName, gift, roomId)
+                ?.onSuccess {
+                    bumpPrototype()
+                    _giftBurst.value = GiftBurstEvent(
+                        emoji = gift.emoji,
+                        giftName = gift.name,
+                        senderName = profile.displayName,
+                        recipientName = recipientName,
+                        coinCost = gift.coinCost
+                    )
+                }
+                ?.onFailure { notify(it.localizedMessage ?: "Could not send gift") }
+            return
+        }
         viewModelScope.launch {
-            repository.sendVirtualGift(profile, recipientId, recipientName, gift, roomId)
+            repo.sendVirtualGift(profile, recipientId, recipientName, gift, roomId)
                 .onSuccess {
                     _giftBurst.value = GiftBurstEvent(
                         emoji = gift.emoji,
@@ -472,36 +706,64 @@ class SocialVerseViewModel(
     // --- Friends, CP & Follows ---
 
     fun sendFriendRequest(target: UserPublicProfile) {
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.sendSocialRequest(false, target)
+            bumpPrototype()
+            notify("Friend request sent to ${target.displayName}!")
+            return
+        }
         val profile = currentProfileOrNull() ?: return
         viewModelScope.launch {
-            repository.sendSocialRequest("friend_requests", profile, target)
+            repo.sendSocialRequest("friend_requests", profile, target)
                 .onSuccess { notify("Friend request sent to ${target.displayName}!") }
                 .onFailure { notify(it.localizedMessage ?: "Request failed") }
         }
     }
 
     fun respondFriendRequest(req: SocialRequest, newStatus: String) {
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.respondSocialRequest(false, req, newStatus)
+            bumpPrototype()
+            notify("Friend request ${newStatus.lowercase()}")
+            return
+        }
         val profile = currentProfileOrNull() ?: return
         viewModelScope.launch {
-            repository.respondSocialRequest("friend_requests", req, newStatus, profile)
+            repo.respondSocialRequest("friend_requests", req, newStatus, profile)
                 .onSuccess { notify("Friend request ${newStatus.lowercase()}") }
                 .onFailure { notify(it.localizedMessage ?: "Update failed") }
         }
     }
 
     fun sendCpRequest(target: UserPublicProfile) {
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.sendSocialRequest(true, target)
+            bumpPrototype()
+            notify("CP Partner request sent to ${target.displayName}!")
+            return
+        }
         val profile = currentProfileOrNull() ?: return
         viewModelScope.launch {
-            repository.sendSocialRequest("cp_requests", profile, target)
+            repo.sendSocialRequest("cp_requests", profile, target)
                 .onSuccess { notify("CP Partner request sent to ${target.displayName}!") }
                 .onFailure { notify(it.localizedMessage ?: "CP request failed") }
         }
     }
 
     fun respondCpRequest(req: SocialRequest, newStatus: String) {
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.respondSocialRequest(true, req, newStatus)
+            bumpPrototype()
+            notify("CP status updated")
+            return
+        }
         val profile = currentProfileOrNull() ?: return
         viewModelScope.launch {
-            repository.respondSocialRequest("cp_requests", req, newStatus, profile)
+            repo.respondSocialRequest("cp_requests", req, newStatus, profile)
                 .onSuccess { notify("CP status updated") }
                 .onFailure { notify(it.localizedMessage ?: "Update failed") }
         }
@@ -509,8 +771,15 @@ class SocialVerseViewModel(
 
     fun toggleFollow(target: UserPublicProfile) {
         val isFollowing = follows.value.any { it.followingId == target.userId }
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.toggleFollow(target, isFollowing)
+            bumpPrototype()
+            notify(if (isFollowing) "Unfollowed ${target.displayName}" else "Following ${target.displayName}")
+            return
+        }
         viewModelScope.launch {
-            repository.toggleFollow(target, isFollowing)
+            repo.toggleFollow(target, isFollowing)
                 .onSuccess { notify(if (isFollowing) "Unfollowed ${target.displayName}" else "Following ${target.displayName}") }
                 .onFailure { notify(it.localizedMessage ?: "Action failed") }
         }
@@ -519,14 +788,20 @@ class SocialVerseViewModel(
     // --- Messaging & Private Calls ---
 
     fun openDirectChat(other: UserPublicProfile) {
-        val profile = currentProfileOrNull() ?: return
         val blocked = myPrivateState.value?.blockedUids.orEmpty()
         if (other.userId in blocked) {
             notify("Unblock ${other.displayName} first to start a conversation.")
             return
         }
+        val repo = repository
+        if (repo == null) {
+            _activeConversationId.value = prototypeStore?.openOrCreateDirectConversation(other)
+            bumpPrototype()
+            return
+        }
+        val profile = currentProfileOrNull() ?: return
         viewModelScope.launch {
-            repository.openOrCreateDirectConversation(profile, other)
+            repo.openOrCreateDirectConversation(profile, other)
                 .onSuccess { convId -> _activeConversationId.value = convId }
                 .onFailure { notify(it.localizedMessage ?: "Failed to open chat") }
         }
@@ -541,8 +816,15 @@ class SocialVerseViewModel(
     }
 
     fun createGroupChat(title: String, announcement: String, memberUids: List<String>) {
+        val repo = repository
+        if (repo == null) {
+            _activeConversationId.value = prototypeStore?.createGroupConversation(title, announcement, memberUids)
+            bumpPrototype()
+            notify("Group chat created!")
+            return
+        }
         viewModelScope.launch {
-            repository.createGroupConversation(title, announcement, memberUids)
+            repo.createGroupConversation(title, announcement, memberUids)
                 .onSuccess { convId ->
                     _activeConversationId.value = convId
                     notify("Group chat created!")
@@ -558,30 +840,54 @@ class SocialVerseViewModel(
         mediaUri: String? = null,
         replyToText: String? = null
     ) {
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.sendDirectMessage(conversation, text, messageType, mediaUri, replyToText)
+            bumpPrototype()
+            return
+        }
         val profile = currentProfileOrNull() ?: return
         viewModelScope.launch {
-            repository.sendDirectMessage(conversation, profile, text, messageType, mediaUri, replyToText)
+            repo.sendDirectMessage(conversation, profile, text, messageType, mediaUri, replyToText)
                 .onFailure { notify(it.localizedMessage ?: "Send failed") }
         }
     }
 
     fun reactMessage(conversationId: String, messageId: String, emoji: String) {
-        viewModelScope.launch { repository.reactToDirectMessage(conversationId, messageId, emoji) }
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.reactMessage(conversationId, messageId, emoji)
+            bumpPrototype()
+            return
+        }
+        viewModelScope.launch { repo.reactToDirectMessage(conversationId, messageId, emoji) }
     }
 
     fun deleteMessage(conversationId: String, messageId: String) {
-        viewModelScope.launch { repository.deleteDirectMessage(conversationId, messageId) }
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.deleteMessage(conversationId, messageId)
+            bumpPrototype()
+            return
+        }
+        viewModelScope.launch { repo.deleteDirectMessage(conversationId, messageId) }
     }
 
     fun startPrivateCall(callee: UserPublicProfile) {
-        val profile = currentProfileOrNull() ?: return
         val blocked = myPrivateState.value?.blockedUids.orEmpty()
         if (callee.userId in blocked) {
             notify("Cannot call a blocked user.")
             return
         }
+        val repo = repository
+        if (repo == null) {
+            _activeCallId.value = prototypeStore?.startPrivateCall(callee)
+            bumpPrototype()
+            return
+        }
+        val profile = currentProfileOrNull() ?: return
         viewModelScope.launch {
-            repository.startPrivateCall(profile, callee)
+            repo.startPrivateCall(profile, callee)
                 .onSuccess { callId -> _activeCallId.value = callId }
                 .onFailure { notify(it.localizedMessage ?: "Call failed") }
         }
@@ -596,8 +902,14 @@ class SocialVerseViewModel(
             audioEngine.stopCapture()
             if (_activeCallId.value == callId) _activeCallId.value = null
         }
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.updatePrivateCall(callId, status, durationSeconds)
+            bumpPrototype()
+            return
+        }
         viewModelScope.launch {
-            repository.updatePrivateCall(callId, status, durationSeconds)
+            repo.updatePrivateCall(callId, status, durationSeconds)
         }
     }
 
@@ -608,9 +920,16 @@ class SocialVerseViewModel(
     }
 
     fun createFamily(name: String, description: String, emblemEmoji: String) {
+        val repo = repository
+        if (repo == null) {
+            _activeFamilyId.value = prototypeStore?.createFamily(name, description, emblemEmoji)
+            bumpPrototype()
+            notify("Family clan created!")
+            return
+        }
         val profile = currentProfileOrNull() ?: return
         viewModelScope.launch {
-            repository.createFamily(profile, name, description, emblemEmoji)
+            repo.createFamily(profile, name, description, emblemEmoji)
                 .onSuccess { id ->
                     _activeFamilyId.value = id
                     notify("Family clan created!")
@@ -620,9 +939,17 @@ class SocialVerseViewModel(
     }
 
     fun joinFamily(family: Family) {
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.joinFamily(family)
+            _activeFamilyId.value = family.id
+            bumpPrototype()
+            notify("Joined ${family.name}!")
+            return
+        }
         val profile = currentProfileOrNull() ?: return
         viewModelScope.launch {
-            repository.joinFamily(family, profile)
+            repo.joinFamily(family, profile)
                 .onSuccess {
                     _activeFamilyId.value = family.id
                     notify("Joined ${family.name}!")
@@ -632,8 +959,16 @@ class SocialVerseViewModel(
     }
 
     fun leaveFamily(familyId: String) {
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.leaveFamily(familyId)
+            if (_activeFamilyId.value == familyId) _activeFamilyId.value = null
+            bumpPrototype()
+            notify("Left family")
+            return
+        }
         viewModelScope.launch {
-            repository.leaveFamily(familyId)
+            repo.leaveFamily(familyId)
                 .onSuccess {
                     if (_activeFamilyId.value == familyId) _activeFamilyId.value = null
                     notify("Left family")
@@ -643,10 +978,16 @@ class SocialVerseViewModel(
     }
 
     fun sendFamilyChat(familyId: String, text: String) {
-        val profile = currentProfileOrNull() ?: return
         if (text.isBlank()) return
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.sendFamilyMessage(familyId, text)
+            bumpPrototype()
+            return
+        }
+        val profile = currentProfileOrNull() ?: return
         viewModelScope.launch {
-            repository.sendFamilyMessage(familyId, profile, text)
+            repo.sendFamilyMessage(familyId, profile, text)
                 .onFailure { notify(it.localizedMessage ?: "Failed to send") }
         }
     }
@@ -663,11 +1004,22 @@ class SocialVerseViewModel(
         detail: String,
         onDone: (Long?) -> Unit = {}
     ) {
-        viewModelScope.launch {
-            repository.playMiniGame(gameType, periodId, selection, stakeCoins, wonCoins, outcome, detail)
-                .onSuccess { newBal ->
+        val repo = repository
+        if (repo == null) {
+            prototypeStore?.playMiniGame(gameType, periodId, selection, stakeCoins, wonCoins, outcome, detail)
+                ?.onSuccess { newBal ->
+                    bumpPrototype()
                     onDone(newBal)
                 }
+                ?.onFailure {
+                    notify(it.localizedMessage ?: "Game transaction failed")
+                    onDone(null)
+                }
+            return
+        }
+        viewModelScope.launch {
+            repo.playMiniGame(gameType, periodId, selection, stakeCoins, wonCoins, outcome, detail)
+                .onSuccess { newBal -> onDone(newBal) }
                 .onFailure {
                     notify(it.localizedMessage ?: "Game transaction failed")
                     onDone(null)
@@ -678,8 +1030,13 @@ class SocialVerseViewModel(
     // --- Safety Reports ---
 
     fun submitReport(targetId: String, targetType: String, reason: String, details: String) {
+        val repo = repository
+        if (repo == null) {
+            notify("Safety report submitted. Thank you for keeping SocialVerse safe.")
+            return
+        }
         viewModelScope.launch {
-            repository.submitSafetyReport(targetId, targetType, reason, details)
+            repo.submitSafetyReport(targetId, targetType, reason, details)
                 .onSuccess { notify("Safety report submitted. Thank you for keeping SocialVerse safe.") }
                 .onFailure { notify(it.localizedMessage ?: "Report failed") }
         }

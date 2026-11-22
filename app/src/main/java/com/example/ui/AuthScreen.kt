@@ -196,7 +196,10 @@ fun signOutUser(
 }
 
 @Composable
-fun AuthScreen(onAuthSuccess: () -> Unit) {
+fun AuthScreen(
+    onAuthSuccess: () -> Unit,
+    onSkipToPrototype: (() -> Unit)? = null
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val credentialManager = remember { CredentialManager.create(context) }
@@ -437,6 +440,12 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
                             Text("Signing in...", style = MaterialTheme.typography.titleMedium)
                         } else {
                             Text("Continue with Google", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    if (onSkipToPrototype != null) {
+                        Spacer(Modifier.height(10.dp))
+                        androidx.compose.material3.TextButton(onClick = onSkipToPrototype) {
+                            Text("Back to Prototype Demo", color = NeonCyan)
                         }
                     }
                 }
