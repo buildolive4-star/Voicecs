@@ -1,0 +1,6 @@
+{
+  "name": "SocialVerse",
+  "description": "Social entertainment, live voice chat rooms, virtual gifts, VIP memberships, families, and mini-games platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

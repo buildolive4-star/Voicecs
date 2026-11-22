@@ -1,0 +1,433 @@
+{
+  "entities": {
+    "UserPublicProfile": {
+      "title": "UserPublicProfile",
+      "description": "Public social profile for SocialVerse discovery, leaderboards, and rooms (no PII).",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "displayName": { "type": "string" },
+        "avatarEmoji": { "type": "string" },
+        "avatarColorHex": { "type": "string" },
+        "bio": { "type": "string" },
+        "country": { "type": "string" },
+        "language": { "type": "string" },
+        "level": { "type": "integer" },
+        "xp": { "type": "integer" },
+        "vipTier": { "type": "string", "enum": ["NONE", "VIP", "SVIP"] },
+        "profileFrame": { "type": "string" },
+        "nameColor": { "type": "string" },
+        "chatBubbleStyle": { "type": "string" },
+        "familyId": { "type": "string" },
+        "familyName": { "type": "string" },
+        "cpPartnerId": { "type": "string" },
+        "cpPartnerName": { "type": "string" },
+        "followersCount": { "type": "integer" },
+        "friendsCount": { "type": "integer" },
+        "popularityScore": { "type": "integer" },
+        "giftsReceivedValue": { "type": "integer" },
+        "discoverable": { "type": "boolean" },
+        "adultEligible": { "type": "boolean" },
+        "onlineVisible": { "type": "boolean" },
+        "onlineStatus": { "type": "string", "enum": ["ONLINE", "OFFLINE"] },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp via FieldValue.serverTimestamp()" }
+      },
+      "required": ["userId", "username", "displayName", "avatarEmoji", "level", "xp", "vipTier", "discoverable", "adultEligible", "onlineVisible", "onlineStatus", "createdAt", "updatedAt"]
+    },
+    "UserPrivateAccount": {
+      "title": "UserPrivateAccount",
+      "description": "Private user PII, virtual coin wallet balance, privacy preferences, and blocked UIDs.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "fullName": { "type": "string" },
+        "dobIso": { "type": "string" },
+        "coinBalance": { "type": "integer" },
+        "vipTier": { "type": "string", "enum": ["NONE", "VIP", "SVIP"] },
+        "vipExpiryMillis": { "type": "integer" },
+        "lastDailyClaimDay": { "type": "string" },
+        "blockedUids": { "type": "array" },
+        "hideOnline": { "type": "boolean" },
+        "hideLastSeen": { "type": "boolean" },
+        "allowFriendRequests": { "type": "boolean" },
+        "lastDeviceLabel": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "email", "fullName", "dobIso", "coinBalance", "vipTier", "hideOnline", "hideLastSeen", "allowFriendRequests", "createdAt", "updatedAt"]
+    },
+    "WalletLedgerEntry": {
+      "title": "WalletLedgerEntry",
+      "description": "Immutable virtual coin wallet ledger record.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "entryType": { "type": "string" },
+        "amountCoins": { "type": "integer" },
+        "balanceAfter": { "type": "integer" },
+        "description": { "type": "string" },
+        "referenceId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "entryType", "amountCoins", "balanceAfter", "description", "createdAt"]
+    },
+    "UserNotification": {
+      "title": "UserNotification",
+      "description": "In-app notification entry for social, gift, room, call, and event updates.",
+      "type": "object",
+      "properties": {
+        "recipientId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "type": { "type": "string" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "read": { "type": "boolean" },
+        "targetId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["recipientId", "senderId", "senderName", "type", "title", "body", "read", "createdAt"]
+    },
+    "VoiceRoom": {
+      "title": "VoiceRoom",
+      "description": "Live social voice room metadata, controls, and seat occupancy.",
+      "type": "object",
+      "properties": {
+        "hostId": { "type": "string" },
+        "hostName": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "roomType": { "type": "string", "enum": ["PUBLIC", "PRIVATE", "PASSWORD", "FRIENDS", "VIP"] },
+        "passwordCode": { "type": "string" },
+        "language": { "type": "string" },
+        "announcement": { "type": "string" },
+        "themeKey": { "type": "string" },
+        "maxSeats": { "type": "integer" },
+        "participantCount": { "type": "integer" },
+        "status": { "type": "string", "enum": ["LIVE", "CLOSED"] },
+        "publicListed": { "type": "boolean" },
+        "adultOnly": { "type": "boolean" },
+        "moderatorUids": { "type": "array" },
+        "seatUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["hostId", "hostName", "title", "category", "roomType", "language", "maxSeats", "participantCount", "status", "publicListed", "adultOnly", "createdAt", "updatedAt"]
+    },
+    "VoiceRoomSeat": {
+      "title": "VoiceRoomSeat",
+      "description": "Microphone seat state inside a voice room.",
+      "type": "object",
+      "properties": {
+        "roomId": { "type": "string" },
+        "seatIndex": { "type": "integer" },
+        "occupantUid": { "type": "string" },
+        "occupantName": { "type": "string" },
+        "occupantAvatar": { "type": "string" },
+        "occupantVip": { "type": "string" },
+        "muted": { "type": "boolean" },
+        "locked": { "type": "boolean" },
+        "speaking": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["roomId", "seatIndex", "occupantUid", "muted", "locked", "speaking", "updatedAt"]
+    },
+    "VoiceRoomMessage": {
+      "title": "VoiceRoomMessage",
+      "description": "Real-time text or gift announcement message in a voice room.",
+      "type": "object",
+      "properties": {
+        "roomId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderVip": { "type": "string" },
+        "senderChatBubble": { "type": "string" },
+        "text": { "type": "string" },
+        "messageType": { "type": "string", "enum": ["TEXT", "GIFT", "SYSTEM"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["roomId", "senderId", "senderName", "text", "messageType", "createdAt"]
+    },
+    "SpeakerRequest": {
+      "title": "SpeakerRequest",
+      "description": "Listener request to take a microphone seat in a voice room.",
+      "type": "object",
+      "properties": {
+        "roomId": { "type": "string" },
+        "requesterId": { "type": "string" },
+        "requesterName": { "type": "string" },
+        "requesterAvatar": { "type": "string" },
+        "status": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["roomId", "requesterId", "requesterName", "status", "createdAt", "updatedAt"]
+    },
+    "SocialRequest": {
+      "title": "SocialRequest",
+      "description": "Friend or CP/Partner request between two users.",
+      "type": "object",
+      "properties": {
+        "fromUserId": { "type": "string" },
+        "fromName": { "type": "string" },
+        "fromAvatar": { "type": "string" },
+        "toUserId": { "type": "string" },
+        "toName": { "type": "string" },
+        "toAvatar": { "type": "string" },
+        "participantUids": { "type": "array" },
+        "status": { "type": "string", "enum": ["PENDING", "ACCEPTED", "REJECTED", "CANCELLED", "ENDED"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fromUserId", "fromName", "toUserId", "toName", "participantUids", "status", "createdAt", "updatedAt"]
+    },
+    "FollowRelation": {
+      "title": "FollowRelation",
+      "description": "One-way follow relationship.",
+      "type": "object",
+      "properties": {
+        "followerId": { "type": "string" },
+        "followingId": { "type": "string" },
+        "followingName": { "type": "string" },
+        "followingAvatar": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["followerId", "followingId", "followingName", "createdAt"]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "Direct or group messaging conversation.",
+      "type": "object",
+      "properties": {
+        "memberUids": { "type": "array" },
+        "type": { "type": "string", "enum": ["DIRECT", "GROUP"] },
+        "title": { "type": "string" },
+        "announcement": { "type": "string" },
+        "adminUid": { "type": "string" },
+        "lastMessage": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["memberUids", "type", "title", "adminUid", "lastMessage", "createdAt", "updatedAt"]
+    },
+    "DirectMessage": {
+      "title": "DirectMessage",
+      "description": "Message inside a direct or group conversation.",
+      "type": "object",
+      "properties": {
+        "memberUids": { "type": "array" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "text": { "type": "string" },
+        "messageType": { "type": "string", "enum": ["TEXT", "STICKER", "IMAGE", "VOICE_NOTE"] },
+        "mediaUri": { "type": "string" },
+        "replyToText": { "type": "string" },
+        "reaction": { "type": "string" },
+        "deleted": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["memberUids", "senderId", "senderName", "text", "messageType", "deleted", "createdAt"]
+    },
+    "PrivateCall": {
+      "title": "PrivateCall",
+      "description": "Private 1-on-1 voice call session and history record.",
+      "type": "object",
+      "properties": {
+        "callerId": { "type": "string" },
+        "callerName": { "type": "string" },
+        "calleeId": { "type": "string" },
+        "calleeName": { "type": "string" },
+        "participantUids": { "type": "array" },
+        "status": { "type": "string", "enum": ["RINGING", "ACTIVE", "ENDED", "DECLINED", "MISSED"] },
+        "durationSeconds": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["callerId", "callerName", "calleeId", "calleeName", "participantUids", "status", "durationSeconds", "createdAt", "updatedAt"]
+    },
+    "GiftTransaction": {
+      "title": "GiftTransaction",
+      "description": "Immutable virtual gift record.",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "recipientId": { "type": "string" },
+        "recipientName": { "type": "string" },
+        "giftId": { "type": "string" },
+        "giftName": { "type": "string" },
+        "giftEmoji": { "type": "string" },
+        "coinCost": { "type": "integer" },
+        "roomId": { "type": "string" },
+        "participantUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["senderId", "senderName", "recipientId", "recipientName", "giftId", "giftName", "giftEmoji", "coinCost", "participantUids", "createdAt"]
+    },
+    "Family": {
+      "title": "Family",
+      "description": "SocialVerse family community clan.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "emblemEmoji": { "type": "string" },
+        "announcement": { "type": "string" },
+        "memberCount": { "type": "integer" },
+        "activityScore": { "type": "integer" },
+        "listed": { "type": "boolean" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "name", "description", "emblemEmoji", "memberCount", "activityScore", "listed", "memberUids", "createdAt", "updatedAt"]
+    },
+    "FamilyMember": {
+      "title": "FamilyMember",
+      "description": "Membership record and role inside a family.",
+      "type": "object",
+      "properties": {
+        "familyId": { "type": "string" },
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "avatarEmoji": { "type": "string" },
+        "role": { "type": "string", "enum": ["OWNER", "CO_OWNER", "ADMIN", "MODERATOR", "MEMBER"] },
+        "status": { "type": "string", "enum": ["PENDING", "ACTIVE"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["familyId", "userId", "displayName", "role", "status", "createdAt", "updatedAt"]
+    },
+    "FamilyMessage": {
+      "title": "FamilyMessage",
+      "description": "Message in a family community chat.",
+      "type": "object",
+      "properties": {
+        "familyId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["familyId", "senderId", "senderName", "text", "createdAt"]
+    },
+    "GameRecord": {
+      "title": "GameRecord",
+      "description": "User mini-game round participation and virtual coin outcome.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "gameType": { "type": "string" },
+        "periodId": { "type": "string" },
+        "selection": { "type": "string" },
+        "stakeCoins": { "type": "integer" },
+        "wonCoins": { "type": "integer" },
+        "outcome": { "type": "string", "enum": ["WIN", "LOSS", "DRAW"] },
+        "detail": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "gameType", "periodId", "selection", "stakeCoins", "wonCoins", "outcome", "createdAt"]
+    },
+    "SafetyReport": {
+      "title": "SafetyReport",
+      "description": "User safety report for moderation review.",
+      "type": "object",
+      "properties": {
+        "reporterId": { "type": "string" },
+        "targetId": { "type": "string" },
+        "targetType": { "type": "string", "enum": ["USER", "ROOM", "MESSAGE"] },
+        "reason": { "type": "string" },
+        "details": { "type": "string" },
+        "status": { "type": "string", "enum": ["SUBMITTED"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["reporterId", "targetId", "targetType", "reason", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserPublicProfile" },
+      "description": "Public discoverable user profiles (no PII)."
+    },
+    "/users_private/{userId}": {
+      "schema": { "$ref": "#/entities/UserPrivateAccount" },
+      "description": "Owner-only PII, virtual coin wallet, and privacy controls."
+    },
+    "/users_private/{userId}/wallet_ledger/{entryId}": {
+      "schema": { "$ref": "#/entities/WalletLedgerEntry" },
+      "description": "Owner-only immutable virtual coin transaction ledger."
+    },
+    "/users_private/{userId}/notifications/{notifId}": {
+      "schema": { "$ref": "#/entities/UserNotification" },
+      "description": "User notification inbox."
+    },
+    "/voice_rooms/{roomId}": {
+      "schema": { "$ref": "#/entities/VoiceRoom" },
+      "description": "Live voice chat rooms."
+    },
+    "/voice_rooms/{roomId}/seats/{seatId}": {
+      "schema": { "$ref": "#/entities/VoiceRoomSeat" },
+      "description": "Voice room microphone seats."
+    },
+    "/voice_rooms/{roomId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/VoiceRoomMessage" },
+      "description": "Voice room live text chat."
+    },
+    "/voice_rooms/{roomId}/speaker_requests/{requesterId}": {
+      "schema": { "$ref": "#/entities/SpeakerRequest" },
+      "description": "Listener mic requests for a voice room."
+    },
+    "/friend_requests/{requestId}": {
+      "schema": { "$ref": "#/entities/SocialRequest" },
+      "description": "Friend requests and friendships."
+    },
+    "/cp_requests/{requestId}": {
+      "schema": { "$ref": "#/entities/SocialRequest" },
+      "description": "Voluntary virtual CP / Partner requests."
+    },
+    "/follows/{followId}": {
+      "schema": { "$ref": "#/entities/FollowRelation" },
+      "description": "Follow relationships."
+    },
+    "/conversations/{conversationId}": {
+      "schema": { "$ref": "#/entities/Conversation" },
+      "description": "Private and group chats."
+    },
+    "/conversations/{conversationId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/DirectMessage" },
+      "description": "Messages inside private and group conversations."
+    },
+    "/private_calls/{callId}": {
+      "schema": { "$ref": "#/entities/PrivateCall" },
+      "description": "Private 1-on-1 voice call records."
+    },
+    "/gift_transactions/{txId}": {
+      "schema": { "$ref": "#/entities/GiftTransaction" },
+      "description": "Virtual gift transaction history."
+    },
+    "/families/{familyId}": {
+      "schema": { "$ref": "#/entities/Family" },
+      "description": "Family communities."
+    },
+    "/families/{familyId}/members/{memberId}": {
+      "schema": { "$ref": "#/entities/FamilyMember" },
+      "description": "Family community memberships."
+    },
+    "/families/{familyId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/FamilyMessage" },
+      "description": "Family community chat messages."
+    },
+    "/game_records/{recordId}": {
+      "schema": { "$ref": "#/entities/GameRecord" },
+      "description": "User mini-game participation and virtual coin scoring history."
+    },
+    "/reports/{reportId}": {
+      "schema": { "$ref": "#/entities/SafetyReport" },
+      "description": "User safety and moderation reports."
+    }
+  }
+}
